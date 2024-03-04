@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.0;
+
+interface ITellorOracle {
+    function depositStake(uint256 _amount) external;
+    function submitValue(
+        bytes32 _queryId,
+        bytes calldata _value,
+        uint256 _nonce,
+        bytes calldata _queryData
+    ) external;
+    function requestStakingWithdraw(uint256 _amount) external;
+    function withdrawStake() external;
+    function getTimeOfLastNewValue() external view returns (uint256);
+}
+
+interface ITellorFlex {
+    function mintToOracle() external;
+    function approve(address _spender, uint256 _amount) external;
+    function transfer(address _recipient, uint256 _amount) external returns (bool);
+    function balanceOf(address _account) external view returns (uint256);
+}
+
+contract TellorMagic {
+    address public owner;
+    ITellorOracle public tellorOracle = ITellorOracle(0x8cFc184c877154a8F9ffE0fe75649dbe5e2DBEbf);
+    ITellorFlex public tellorFlex = ITellorFlex(0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only contract owner can call this function");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function setTellorOracle(address _tellorOracle) external onlyOwner {
+        tellorOracle = ITellorOracle(_tellorOracle);
+    }
+
+    function setTellorFlex(address _tellorFlex) external onlyOwner {
+        tellorFlex = ITellorFlex(_tellorFlex);
+    }
+
+    function depositStake(uint256 _amount) external {
+        tellorFlex.approve(address(tellorOracle), _amount);
+        tellorOracle.depositStake(_amount);
+    }
+
+    function submitValue(
+        bytes32 _queryId,
+        bytes calldata _value,
+        uint256 _nonce,
+        bytes calldata _queryData
+    ) external onlyOwner {
+        require(block.timestamp - tellorOracle.getTimeOfLastNewValue() > 60, "too few reward");
+        tellorOracle.submitValue(_queryId, _value, _nonce, _queryData);
+    }
+
+    function submitValueWithTransfer(
+        bytes32 _queryId,
+        bytes calldata _value,
+        uint256 _nonce,
+        bytes calldata _queryData
+    ) external onlyOwner {
+        require(block.timestamp - tellorOracle.getTimeOfLastNewValue() > 60, "too few reward");
+        tellorOracle.submitValue(_queryId, _value, _nonce, _queryData);
+        uint256 balance = tellorFlex.balanceOf(address(this));
+        require(tellorFlex.transfer(owner, balance), "Transfer failed");
+    }
+
+    function requestStakingWithdraw(uint256 _amount) external onlyOwner {
+        tellorOracle.requestStakingWithdraw(_amount);
+    }
+
+    function withdrawStake() external onlyOwner {
+        tellorOracle.withdrawStake();
+    }
+
+    function mintToOracle() external onlyOwner {
+        tellorFlex.mintToOracle();
+    }
+
+    function approve(address _spender, uint256 _amount) external onlyOwner {
+        tellorFlex.approve(_spender, _amount);
+    }
+
+    function withdraw() external onlyOwner {
+        uint256 balance = tellorFlex.balanceOf(address(this));
+        require(tellorFlex.transfer(owner, balance), "Transfer failed");
+    }
+}
