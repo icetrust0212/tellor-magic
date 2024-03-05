@@ -31,11 +31,13 @@ contract TellorMagic {
     }
 
     address public owner;
-    // ITellorOracle public tellorOracle = ITellorOracle(0x8cFc184c877154a8F9ffE0fe75649dbe5e2DBEbf);
-    // ITellorFlex public tellorFlex = ITellorFlex(0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0);
+    address public marketingWallet;
 
-    ITellorOracle public tellorOracle = ITellorOracle(0xB0ff935b775a70504b810cf97c39987058e18550); // polygon mumbai
-    ITellorFlex public tellorFlex = ITellorFlex(0x3251838bd813fdf6a97D32781e011cce8D225d59); // polygon mumbai
+    ITellorOracle public tellorOracle = ITellorOracle(0x8cFc184c877154a8F9ffE0fe75649dbe5e2DBEbf);
+    ITellorFlex public tellorFlex = ITellorFlex(0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0);
+
+    // ITellorOracle public tellorOracle = ITellorOracle(0xB0ff935b775a70504b810cf97c39987058e18550); // polygon mumbai
+    // ITellorFlex public tellorFlex = ITellorFlex(0x3251838bd813fdf6a97D32781e011cce8D225d59); // polygon mumbai
     
     mapping(address => Stake) public userStakes;
     mapping(address => uint256) private rewardIndexOf;
@@ -43,8 +45,11 @@ contract TellorMagic {
     uint256 private rewardIndex;
 
     uint256 public totalStakedAmount;
-    uint256 public MIN_STAKE_AMOUNT = 1e18;
+    uint256 public MIN_STAKE_AMOUNT = 1e18; // 1 TRB
+    uint256 public managementFee = 1_000; // 10%
+
     uint256 private constant MULTIPLIER = 1e18;
+    uint256 private constant MANAGEMENT_FEE_CAP = 3_000; // Management fee should not exceed 30%.
 
     bool public stakePaused;
 
@@ -63,8 +68,9 @@ contract TellorMagic {
         _;
     }
 
-    constructor() {
+    constructor(address _marketingWallet) {
         owner = msg.sender;
+        marketingWallet = _marketingWallet;
     }
 
     function _updateRewardIndex() internal {
@@ -94,7 +100,12 @@ contract TellorMagic {
 
 
     function _updateRewards(address account) private {
-        userStakes[account].rewards += _calculateRewards(account);
+        uint256 rewards = _calculateRewards(account);
+        uint256 fee = rewards * managementFee / 10_000;
+
+        userStakes[account].rewards += (rewards - fee);
+        userStakes[marketingWallet].rewards += fee;
+
         rewardIndexOf[account] = rewardIndex;
     }
 
@@ -148,6 +159,8 @@ contract TellorMagic {
     /// @notice Withdraw from tellor oracle.
     function withdrawStake() external {
         Stake storage _stake = userStakes[msg.sender];
+
+        // 7 days limitation comes from tellor oracle contract. :)
         require(_stake.lockedTimestamp + 7 days < block.timestamp, "7 days is not passed yet");
 
         // withdraw from oracle
@@ -217,5 +230,15 @@ contract TellorMagic {
     function transferOwnership(address _newOwner) external onlyOwner {
         require(_newOwner != address(0), "Invalid owner");
         owner = _newOwner;
+    }
+
+    function setManagementFee(uint256 _fee) external onlyOwner {
+        require(_fee <= MANAGEMENT_FEE_CAP, "Too high");
+        managementFee = _fee;
+    }
+
+    function setMarketingWallet(address _account) external onlyOwner {
+        require(_account != address(0), "Invalid marketing wallet");
+        marketingWallet = _account;
     }
 }

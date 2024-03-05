@@ -7,7 +7,7 @@ async function main() {
   const [deployer, feeReceiver] = await ethers.getSigners();
 
   // Deploy tellor
-  const tellorMagic = await ethers.deployContract("TellorMagic");
+  const tellorMagic = await ethers.deployContract("TellorMagic", [feeReceiver.address]);
   await tellorMagic.waitForDeployment();
   console.log("tellorMagic: ", await tellorMagic.getAddress())
 }
