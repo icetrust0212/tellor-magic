@@ -36,9 +36,6 @@ contract TellorMagic {
     ITellorOracle public tellorOracle = ITellorOracle(0x8cFc184c877154a8F9ffE0fe75649dbe5e2DBEbf);
     ITellorFlex public tellorFlex = ITellorFlex(0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0);
 
-    // ITellorOracle public tellorOracle = ITellorOracle(0xB0ff935b775a70504b810cf97c39987058e18550); // polygon mumbai
-    // ITellorFlex public tellorFlex = ITellorFlex(0x3251838bd813fdf6a97D32781e011cce8D225d59); // polygon mumbai
-    
     mapping(address => Stake) public userStakes;
     mapping(address => uint256) private rewardIndexOf;
     
@@ -46,10 +43,9 @@ contract TellorMagic {
 
     uint256 public totalStakedAmount;
     uint256 public MIN_STAKE_AMOUNT = 1e18; // 1 TRB
-    uint256 public managementFee = 1_000; // 10%
+    uint256 public feeForGas = 7_000; // 70% of rewards should be used to cover gas fee.
 
     uint256 private constant MULTIPLIER = 1e18;
-    uint256 private constant MANAGEMENT_FEE_CAP = 3_000; // Management fee should not exceed 30%.
 
     bool public stakePaused;
 
@@ -101,7 +97,7 @@ contract TellorMagic {
 
     function _updateRewards(address account) private {
         uint256 rewards = _calculateRewards(account);
-        uint256 fee = rewards * managementFee / 10_000;
+        uint256 fee = rewards * feeForGas / 10_000;
 
         userStakes[account].rewards += (rewards - fee);
         userStakes[marketingWallet].rewards += fee;
@@ -232,9 +228,9 @@ contract TellorMagic {
         owner = _newOwner;
     }
 
-    function setManagementFee(uint256 _fee) external onlyOwner {
-        require(_fee <= MANAGEMENT_FEE_CAP, "Too high");
-        managementFee = _fee;
+    function setfeeForGas(uint256 _fee) external onlyOwner {
+        require(_fee <= 10_000, "Too high");
+        feeForGas = _fee;
     }
 
     function setMarketingWallet(address _account) external onlyOwner {
